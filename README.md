@@ -22,9 +22,9 @@ Open `http://localhost:5173`. The API runs at `http://localhost:4000`.
 
 | Profile | Password | Access |
 |---|---|---|
-| Admin | `admin123` | Full access and request review |
-| Nadiya (Director) | `nadiya123` | Create requests; approve Mahfuz's requests; assign Mahfuz tasks |
-| Mahfuz (CEO) | `mahfuz123` | Create requests; approve Nadiya's requests; assign Nadiya tasks |
+| Admin | `` | Full access and request review |
+| Nadiya (Director) | `` | Create requests; approve Mahfuz's requests; assign Mahfuz tasks |
+| Mahfuz (CEO) | `` | Create requests; approve Nadiya's requests; assign Nadiya tasks |
 
 Data is persisted in MongoDB Atlas. Configure `MONGODB_URI`, `MONGODB_DB`, and `JWT_SECRET` in `backend/.env` (see `backend/.env.example`).
 
