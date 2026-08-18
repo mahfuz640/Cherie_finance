@@ -1,0 +1,14 @@
+{
+  "name": "cheries-finance-workspace",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": ["frontend", "backend"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace frontend\" \"npm run dev --workspace backend\"",
+    "frontend": "npm run dev --workspace frontend",
+    "backend": "npm run dev --workspace backend",
+    "build": "npm run build --workspace frontend",
+    "start": "npm run start --workspace backend"
+  },
+  "devDependencies": { "concurrently": "latest" }
+}
