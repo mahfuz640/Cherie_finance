@@ -130,3 +130,9 @@ th, td { border-color: #f6e7ec; }
 .delete-action { color: #a52f52; background: #ffedf2; }
 .delete-action:hover { color: white; background: #b3345e; }
 .modal-note { margin: 12px 0 0; padding: 11px 13px; border-radius: 10px; color: var(--rose-800); background: var(--rose-100); font-size: 13px; line-height: 1.45; }
+
+.password-input { position: relative; }
+.password-input input { width: 100%; padding-right: 48px; }
+.password-input button { position: absolute; top: 50%; right: 8px; width: 34px; height: 34px; display: grid; place-items: center; transform: translateY(-50%); border: 0; border-radius: 8px; color: var(--muted); background: transparent; }
+.password-input button:hover { color: var(--rose-700); background: var(--rose-100); }
+.password-input button:focus-visible { outline: 2px solid var(--rose-500); outline-offset: 1px; }

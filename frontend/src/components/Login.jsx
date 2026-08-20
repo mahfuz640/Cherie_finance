@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowUpRight, Building2 } from 'lucide-react';
+import { ArrowUpRight, Building2, Eye, EyeOff } from 'lucide-react';
 import { API } from '../api';
 
 const ROLES = [
@@ -14,6 +14,7 @@ const DEMO_PASSWORDS = {
 export default function Login({ onLogin }) {
   const [role, setRole] = useState('admin');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
   async function submit(event) {
@@ -63,7 +64,7 @@ export default function Login({ onLogin }) {
               </button>
             ))}
           </div>
-          <label>Password<input autoFocus type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" /></label>
+          <label>Password<div className="password-input"><input autoFocus type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" /><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff size={19} /> : <Eye size={19} />}</button></div></label>
           {error && <div className="error">{error}</div>}
           <button className="primary">Sign in <ArrowUpRight size={18} /></button>
           <p className="hint">Initial demo password: {DEMO_PASSWORDS[role]}</p>
