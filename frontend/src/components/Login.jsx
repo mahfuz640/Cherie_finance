@@ -19,15 +19,19 @@ export default function Login({ onLogin }) {
   async function submit(event) {
     event.preventDefault();
     setError('');
-    const response = await fetch(`${API}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role, password }),
-    });
-    const result = await response.json();
-    if (!response.ok) return setError(result.message);
-    localStorage.setItem('financeSession', JSON.stringify(result));
-    onLogin(result);
+    try {
+      const response = await fetch(`${API}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role, password }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) return setError(result.message || 'Login failed.');
+      localStorage.setItem('financeSession', JSON.stringify(result));
+      onLogin(result);
+    } catch {
+      setError('Unable to reach the server. Please try again or check the deployment URL.');
+    }
   }
 
   function chooseRole(nextRole) {

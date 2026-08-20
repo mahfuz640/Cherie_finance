@@ -20,23 +20,31 @@ Open `http://localhost:5173`. The API runs at `http://localhost:4000`.
 
 ## Deploy to Render
 
-The repository includes `render.yaml` for a single Render Web Service that serves both the React frontend and Express API.
+The repository includes `render.yaml` for two monorepo services: an Express Web Service and a React Static Site.
 
 1. Commit and push the repository to GitHub/GitLab.
 2. In Render, choose **New → Blueprint** and connect the repository.
 3. Enter `MONGODB_URI` when Render prompts for it. `JWT_SECRET` is generated automatically.
 4. Ensure MongoDB Atlas Network Access permits the outbound IP ranges shown for the Render service.
-5. Deploy, then open the service's `onrender.com` URL.
+5. Deploy, then open the frontend service's `onrender.com` URL.
 
-For an existing manually configured Web Service, keep the root directory blank and use:
+For existing manually configured services, use these settings:
 
 ```text
-Build Command: npm ci && npm run build
+Backend Web Service
+Root Directory: backend
+Build Command: npm ci
 Start Command: npm start
 Health Check Path: /api/health
+
+Frontend Static Site
+Root Directory: frontend
+Build Command: npm ci && npm run build
+Publish Directory: dist
+VITE_API_URL: https://cherie-finance-backend.onrender.com/api
 ```
 
-Set `MONGODB_URI`, `MONGODB_DB=cheries_finance`, and a strong `JWT_SECRET` in the Render environment. Production uses same-origin `/api`; `VITE_API_URL` is only needed when frontend and backend are deployed separately.
+Add a frontend rewrite from `/*` to `/index.html`. Set `MONGODB_URI`, `MONGODB_DB=cheries_finance`, and a strong `JWT_SECRET` in the backend environment.
 
 ### Render health monitor
 

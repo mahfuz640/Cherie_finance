@@ -4,6 +4,7 @@ import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { MongoClient, ObjectId } from 'mongodb';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -367,13 +368,20 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 const backendDirectory = path.dirname(fileURLToPath(import.meta.url));
 const frontendDistDirectory = path.resolve(backendDirectory, '../frontend/dist');
-app.use(express.static(frontendDistDirectory));
-app.use((req, res, next) => {
-  if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
-  res.sendFile(path.join(frontendDistDirectory, 'index.html'), (error) => {
-    if (error) next(error);
+const frontendIndexPath = path.join(frontendDistDirectory, 'index.html');
+
+if (existsSync(frontendIndexPath)) {
+  app.use(express.static(frontendDistDirectory));
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
+    res.sendFile(frontendIndexPath, (error) => {
+      if (error) next(error);
+    });
   });
-});
+} else {
+  console.warn('Frontend build not found; starting in API-only mode.');
+  app.get('/', (req, res) => res.json({ service: 'Cherie Finance API', status: 'ok', health: '/api/health' }));
+}
 
 app.use((error, req, res, next) => {
   console.error(error);
