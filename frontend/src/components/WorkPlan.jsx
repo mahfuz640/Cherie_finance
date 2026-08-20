@@ -1,4 +1,4 @@
-import { CalendarClock, CheckCircle2, Circle, Clock3, Pencil, Plus, Users } from 'lucide-react';
+import { CalendarClock, CheckCircle2, Circle, Clock3, Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { useState } from 'react';
 import Modal from './Modal';
 
@@ -19,7 +19,7 @@ function formatSchedule(task) {
   return schedule.toLocaleString('en-BD', { dateStyle: 'medium', timeStyle: task.due_time ? 'short' : undefined });
 }
 
-export default function WorkPlan({ tasks, role, onCreate, onUpdate }) {
+export default function WorkPlan({ tasks, role, onCreate, onUpdate, onDelete }) {
   const [editingTask, setEditingTask] = useState(null);
   const options = assignmentOptions(role);
   const canAssign = options.length > 0;
@@ -86,7 +86,7 @@ export default function WorkPlan({ tasks, role, onCreate, onUpdate }) {
               <article className={`task-card ${task.status}`} key={task.id}>
                 <div className="task-card-top">
                   <span className={`priority ${task.priority}`}>{task.priority}</span>
-                  <div className="task-card-actions">{role === 'admin' && <button type="button" className="edit-action" title="Edit task" onClick={() => setEditingTask(task)}><Pencil size={16} /></button>}<span className={`task-status ${task.status}`}><StatusIcon />{STATUS_LABELS[task.status]}</span></div>
+                  <div className="task-card-actions">{role === 'admin' && <><button type="button" className="edit-action" title="Edit task" onClick={() => setEditingTask(task)}><Pencil size={16} /></button><button type="button" className="delete-action" title="Delete task" onClick={() => { if (window.confirm(`Delete the task “${task.title}”?`)) onDelete(task.id); }}><Trash2 size={16} /></button></>}<span className={`task-status ${task.status}`}><StatusIcon />{STATUS_LABELS[task.status]}</span></div>
                 </div>
                 <h3>{task.title}</h3>
                 {task.description && <div className="planning-note"><small>PLANNING NOTES</small><p>{task.description}</p></div>}

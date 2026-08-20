@@ -10,6 +10,7 @@ import RequestsTable from './RequestsTable';
 import Sidebar from './Sidebar';
 import StatsGrid from './StatsGrid';
 import TeamManagement from './TeamManagement';
+import TransactionsTable from './TransactionsTable';
 import WorkPlan from './WorkPlan';
 
 export default function Dashboard({ session, logout }) {
@@ -66,6 +67,10 @@ export default function Dashboard({ session, logout }) {
     if (window.confirm(`Delete the BDT ${Number(investment.amount).toLocaleString('en-BD')} investment?`)) send(`/investments/${investment.id}`, {}, 'DELETE');
   }
 
+  function deleteTransaction(transaction) {
+    send(`/transactions/${transaction.id}`, {}, 'DELETE');
+  }
+
   if (!data) return <div className="loading">{loadError || 'Loading finance workspace…'}{loadError && <button className="primary" onClick={load}>Try again</button>}</div>;
   const currentUser = data.team?.find((member) => member.role === role) || session.user;
 
@@ -84,11 +89,12 @@ export default function Dashboard({ session, logout }) {
         <StatsGrid stats={data.stats} />
         <RequestsTable requests={data.requests} role={role} onReview={(id, status) => send(`/requests/${id}`, { status }, 'PATCH')} onEdit={setEditingRequest} onDelete={deleteRequest} />
         <InvestmentsTable investments={data.investments || []} user={currentUser} onEdit={setEditingInvestment} onDelete={deleteInvestment} />
+        <TransactionsTable transactions={data.transactions || []} role={role} onEdit={(id, changes) => send(`/transactions/${id}`, changes, 'PATCH')} onDelete={deleteTransaction} />
         </div>}
         {activePage === 'plan' && <>
           <header><div><span className="eyebrow">TEAM OPERATIONS</span><h1>Our shared work plan</h1><p>Plan for yourself or each other with notes, date and time.</p></div></header>
           {notice && <div className="notice">{notice}</div>}
-          <WorkPlan tasks={data.tasks || []} role={role} onCreate={(task) => send('/tasks', task)} onUpdate={(id, changes) => send(`/tasks/${id}`, typeof changes === 'string' ? { status: changes } : changes, 'PATCH')} />
+          <WorkPlan tasks={data.tasks || []} role={role} onCreate={(task) => send('/tasks', task)} onUpdate={(id, changes) => send(`/tasks/${id}`, typeof changes === 'string' ? { status: changes } : changes, 'PATCH')} onDelete={(id) => send(`/tasks/${id}`, {}, 'DELETE')} />
         </>}
         {activePage === 'products' && <>
           <header><div><span className="eyebrow">PRODUCT & INVENTORY</span><h1>Product catalog</h1><p>Organize categories, stock products and record every sale.</p></div></header>

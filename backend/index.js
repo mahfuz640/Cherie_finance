@@ -144,7 +144,7 @@ app.get('/api/dashboard', auth, async (req, res) => {
     stats: { invested, paid, remaining: invested - paid, loanRemaining: loan - loanPaid, selling, companyMoney: invested + selling - paid - expense - stockCost - loanPaid, totalQuantity: stockIn, totalSold: sold, totalStock: stockIn - sold, profit: selling - expense - stockCost },
     requests: requestRows.map(serialize),
     investments: investmentRows.map(serialize),
-    transactions: transactionRows.slice(0, 8).map(serialize),
+    transactions: transactionRows.map(serialize),
     tasks: taskRows.map(serialize),
     team: teamRows.map(serialize),
   });
@@ -234,6 +234,22 @@ app.post('/api/transactions', auth, canEdit, async (req, res) => {
   res.status(201).json({ ok: true });
 });
 
+app.patch('/api/transactions/:id', auth, canEdit, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Only Admin can edit finance records.' });
+  const id = idFrom(req.params.id), amount = Number(req.body.amount), quantity = Number(req.body.quantity || 0), note = String(req.body.note || '').trim();
+  if (!id || !Number.isFinite(amount) || amount < 0 || !Number.isInteger(quantity) || quantity < 0 || note.length > 300) return res.status(400).json({ message: 'Enter valid finance record details.' });
+  const result = await transactions.updateOne({ _id: id }, { $set: { amount, quantity, note, updated_at: new Date().toISOString() } });
+  if (!result.matchedCount) return res.status(404).json({ message: 'Finance record not found.' });
+  res.json({ ok: true, message: 'Finance record updated.' });
+});
+
+app.delete('/api/transactions/:id', auth, canEdit, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Only Admin can delete finance records.' });
+  const id = idFrom(req.params.id), result = id && await transactions.deleteOne({ _id: id });
+  if (!result?.deletedCount) return res.status(404).json({ message: 'Finance record not found.' });
+  res.json({ ok: true, message: 'Finance record deleted.' });
+});
+
 app.get('/api/catalog', auth, async (req, res) => {
   const [categoryRows, productRows, saleRows] = await Promise.all([
     categories.find().sort({ name: 1 }).toArray(), products.find().sort({ product_name: 1 }).toArray(), productSales.find().sort({ sold_at: -1 }).limit(50).toArray(),
@@ -273,6 +289,30 @@ app.post('/api/categories', auth, canEdit, async (req, res) => {
   }
 });
 
+app.patch('/api/categories/:id', auth, canEdit, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Only Admin can edit categories.' });
+  const id = idFrom(req.params.id), name = String(req.body.name || '').trim();
+  if (!id || !name || name.length > 60) return res.status(400).json({ message: 'Category name must be between 1 and 60 characters.' });
+  try {
+    const result = await categories.updateOne({ _id: id }, { $set: { name } });
+    if (!result.matchedCount) return res.status(404).json({ message: 'Category not found.' });
+    res.json({ ok: true, message: 'Category updated.' });
+  } catch (error) {
+    if (error.code === 11000) return res.status(409).json({ message: 'This category already exists.' });
+    throw error;
+  }
+});
+
+app.delete('/api/categories/:id', auth, canEdit, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Only Admin can delete categories.' });
+  const id = idFrom(req.params.id);
+  if (!id) return res.status(404).json({ message: 'Category not found.' });
+  if (await products.findOne({ category_id: id })) return res.status(409).json({ message: 'Move or delete products in this category first.' });
+  const result = await categories.deleteOne({ _id: id });
+  if (!result.deletedCount) return res.status(404).json({ message: 'Category not found.' });
+  res.json({ ok: true, message: 'Category deleted.' });
+});
+
 app.post('/api/products', auth, canEdit, async (req, res) => {
   const categoryId = idFrom(req.body.categoryId), itemName = String(req.body.itemName || '').trim(), productName = String(req.body.productName || '').trim();
   const quantity = Number(req.body.quantity), buyPrice = Number(req.body.buyPrice), image = String(req.body.image || '');
@@ -303,18 +343,32 @@ app.patch('/api/products/:id', auth, canEdit, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ message: 'Only Admin can edit products.' });
   const productId = idFrom(req.params.id), categoryId = idFrom(req.body.categoryId);
   const itemName = String(req.body.itemName || '').trim(), productName = String(req.body.productName || '').trim();
-  const image = String(req.body.image || ''), brand = String(req.body.brand || '').trim(), supplier = String(req.body.supplier || '').trim();
+  const quantity = Number(req.body.quantity), buyPrice = Number(req.body.buyPrice), image = String(req.body.image || ''), brand = String(req.body.brand || '').trim(), supplier = String(req.body.supplier || '').trim();
   const unit = String(req.body.unit || 'pcs').trim(), description = String(req.body.description || '').trim();
   const purchaseDate = String(req.body.purchaseDate || ''), expiryDate = String(req.body.expiryDate || ''), lowStockAlert = Number(req.body.lowStockAlert);
   if (!productId || !await products.findOne({ _id: productId })) return res.status(404).json({ message: 'Product not found.' });
   if (!categoryId || !await categories.findOne({ _id: categoryId })) return res.status(400).json({ message: 'Choose a valid category.' });
   if (!itemName || !productName || itemName.length > 100 || productName.length > 120) return res.status(400).json({ message: 'Enter valid item and product names.' });
+  if (!Number.isInteger(quantity) || quantity < 0 || !Number.isFinite(buyPrice) || buyPrice < 0) return res.status(400).json({ message: 'Enter valid quantity and buy price.' });
   if (brand.length > 80 || supplier.length > 100 || !unit || unit.length > 30 || description.length > 500) return res.status(400).json({ message: 'One or more product details are too long.' });
   if ((purchaseDate && !/^\d{4}-\d{2}-\d{2}$/.test(purchaseDate)) || (expiryDate && !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate))) return res.status(400).json({ message: 'Enter valid purchase and expiry dates.' });
   if (!Number.isInteger(lowStockAlert) || lowStockAlert < 0) return res.status(400).json({ message: 'Enter a valid low-stock alert quantity.' });
   if (image && (!/^data:image\/(png|jpeg|webp);base64,/.test(image) || image.length > 2800000)) return res.status(400).json({ message: 'Upload a PNG, JPG, or WebP image smaller than 2 MB.' });
-  await products.updateOne({ _id: productId }, { $set: { category_id: categoryId, item_name: itemName, product_name: productName, image: image || null, brand: brand || null, supplier: supplier || null, unit, description: description || null, purchase_date: purchaseDate || null, expiry_date: expiryDate || null, low_stock_alert: lowStockAlert, updated_at: new Date().toISOString() } });
+  const soldQuantity = await productSales.aggregate([{ $match: { product_id: productId } }, { $group: { _id: null, total: { $sum: '$quantity' } } }]).toArray();
+  const originalQuantity = quantity + Number(soldQuantity[0]?.total || 0);
+  await products.updateOne({ _id: productId }, { $set: { category_id: categoryId, item_name: itemName, product_name: productName, quantity, buy_price: buyPrice, image: image || null, brand: brand || null, supplier: supplier || null, unit, description: description || null, purchase_date: purchaseDate || null, expiry_date: expiryDate || null, low_stock_alert: lowStockAlert, updated_at: new Date().toISOString() } });
+  await transactions.updateOne({ type: 'stock', note: { $regex: `^Product stock: ${product.product_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$` } }, { $set: { amount: originalQuantity * buyPrice, quantity: originalQuantity, note: `Product stock: ${productName}` } });
   res.json({ ok: true, message: 'Product updated.' });
+});
+
+app.delete('/api/products/:id', auth, canEdit, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Only Admin can delete products.' });
+  const productId = idFrom(req.params.id), product = productId && await products.findOne({ _id: productId });
+  if (!product) return res.status(404).json({ message: 'Product not found.' });
+  await productSales.deleteMany({ product_id: productId });
+  await products.deleteOne({ _id: productId });
+  await transactions.deleteMany({ note: `Product stock: ${product.product_name}` });
+  res.json({ ok: true, message: 'Product and its sales history deleted.' });
 });
 
 app.post('/api/products/:id/sales', auth, canEdit, async (req, res) => {
@@ -367,6 +421,14 @@ app.patch('/api/tasks/:id', auth, canEdit, async (req, res) => {
   if (!['todo', 'in_progress', 'completed'].includes(req.body.status)) return res.status(400).json({ message: 'Invalid task status.' });
   await tasks.updateOne({ _id: id }, { $set: { status: req.body.status, updated_at: new Date().toISOString() } });
   res.json({ ok: true });
+});
+
+app.delete('/api/tasks/:id', auth, canEdit, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Only Admin can delete tasks.' });
+  const id = idFrom(req.params.id);
+  const result = id && await tasks.deleteOne({ _id: id });
+  if (!result?.deletedCount) return res.status(404).json({ message: 'Task not found.' });
+  res.json({ ok: true, message: 'Task deleted.' });
 });
 
 app.patch('/api/account/password', auth, async (req, res) => {

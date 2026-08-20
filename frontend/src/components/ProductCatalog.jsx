@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Boxes, Camera, History, Image as ImageIcon, PackagePlus, Pencil, Plus, ShoppingBag, Tag, TrendingUp } from 'lucide-react';
+import { AlertTriangle, Boxes, Camera, History, Image as ImageIcon, PackagePlus, Pencil, Plus, ShoppingBag, Tag, Trash2, TrendingUp } from 'lucide-react';
 import { API } from '../api';
 import Modal from './Modal';
 
@@ -29,6 +29,7 @@ export default function ProductCatalog({ session, logout, notify, refreshDashboa
   const [image, setImage] = useState('');
   const [selectedSale, setSelectedSale] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [editingCategory, setEditingCategory] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const writable = ['admin', 'nadiya', 'mahfuz'].includes(session.user.role);
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${session.token}` };
@@ -93,11 +94,25 @@ export default function ProductCatalog({ session, logout, notify, refreshDashboa
     event.preventDefault();
     const values = new FormData(event.currentTarget);
     const saved = await request(`/products/${editingProduct.id}`, {
-      categoryId: values.get('categoryId'), itemName: values.get('itemName'), productName: values.get('productName'), image,
+      categoryId: values.get('categoryId'), itemName: values.get('itemName'), productName: values.get('productName'), quantity: values.get('quantity'), buyPrice: values.get('buyPrice'), image,
       brand: values.get('brand'), supplier: values.get('supplier'), unit: values.get('unit'), description: values.get('description'),
       purchaseDate: values.get('purchaseDate'), expiryDate: values.get('expiryDate'), lowStockAlert: values.get('lowStockAlert'),
     }, 'PATCH');
     if (saved) { setEditingProduct(null); setImage(''); }
+  }
+
+  async function updateCategory(event) {
+    event.preventDefault();
+    const name = new FormData(event.currentTarget).get('name');
+    if (await request(`/categories/${editingCategory.id}`, { name }, 'PATCH')) setEditingCategory(null);
+  }
+
+  function deleteCategory(category) {
+    if (window.confirm(`Delete the ${category.name} category?`)) request(`/categories/${category.id}`, {}, 'DELETE');
+  }
+
+  function deleteProduct(product) {
+    if (window.confirm(`Delete ${product.product_name}, including its sales history?`)) request(`/products/${product.id}`, {}, 'DELETE');
   }
 
   const visibleProducts = useMemo(() => {
@@ -130,6 +145,7 @@ export default function ProductCatalog({ session, logout, notify, refreshDashboa
             <div className="form-title"><span className="form-icon"><Tag /></span><div><h2>Create category</h2><p>Group similar products together.</p></div></div>
             <div className="inline-field"><input name="name" maxLength="60" placeholder="e.g. Skincare" required /><button className="primary"><Plus /> Add</button></div>
           </form>
+          {session.user.role === 'admin' && <div className="category-manager"><b>Manage categories</b>{catalog.categories.map((category) => <div key={category.id}><span>{category.name}</span><span className="manage-actions"><button type="button" className="edit-action" title="Edit category" onClick={() => setEditingCategory(category)}><Pencil size={15} /></button><button type="button" className="delete-action" title="Delete category" onClick={() => deleteCategory(category)}><Trash2 size={15} /></button></span></div>)}</div>}
 
           <form className="product-form" onSubmit={createProduct}>
             <div className="form-title"><span className="form-icon"><PackagePlus /></span><div><h2>Add a product</h2><p>Record new inventory and its purchase cost.</p></div></div>
@@ -192,6 +208,7 @@ export default function ProductCatalog({ session, logout, notify, refreshDashboa
               <div className="product-dates"><span>Purchased <b>{dateText(product.purchase_date)}</b></span><span>Expires <b>{dateText(product.expiry_date)}</b></span></div>
               {writable && <div className="product-actions">
                 {session.user.role === 'admin' && <button type="button" className="edit-product" onClick={() => { setEditingProduct(product); setImage(product.image || ''); }}><Pencil size={16} /> Edit product</button>}
+                  {session.user.role === 'admin' && <button type="button" className="delete-product" onClick={() => deleteProduct(product)}><Trash2 size={16} /> Delete</button>}
                 <button className="sell-button" disabled={!product.quantity} onClick={() => setSelectedSale(product)}>{product.quantity ? 'Record a sale' : 'Out of stock'}</button>
               </div>}
             </div>
@@ -216,6 +233,8 @@ export default function ProductCatalog({ session, logout, notify, refreshDashboa
         <label>Category<select name="categoryId" defaultValue={editingProduct.category_id} required>{catalog.categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
         <label>Item name<input name="itemName" maxLength="100" defaultValue={editingProduct.item_name} required /></label>
         <label>Product name<input name="productName" maxLength="120" defaultValue={editingProduct.product_name} required /></label>
+        <label>Available quantity<input name="quantity" type="number" min="0" step="1" defaultValue={editingProduct.quantity} required /></label>
+        <label>Buy price per item (BDT)<input name="buyPrice" type="number" min="0" step="0.01" defaultValue={editingProduct.buy_price} required /></label>
         <label>Brand<input name="brand" maxLength="80" defaultValue={editingProduct.brand || ''} /></label>
         <label>Supplier<input name="supplier" maxLength="100" defaultValue={editingProduct.supplier || ''} /></label>
         <label>Unit<select name="unit" defaultValue={editingProduct.unit || 'pcs'}><option value="pcs">Pieces (pcs)</option><option value="box">Box</option><option value="pack">Pack</option><option value="kg">Kilogram (kg)</option><option value="g">Gram (g)</option><option value="litre">Litre</option><option value="ml">Millilitre (ml)</option></select></label>
@@ -224,6 +243,9 @@ export default function ProductCatalog({ session, logout, notify, refreshDashboa
         <label>Expiry date<input name="expiryDate" type="date" defaultValue={editingProduct.expiry_date || ''} /></label>
         <label>Product notes<textarea name="description" maxLength="500" defaultValue={editingProduct.description || ''} /></label>
         <label className="image-upload">{image ? <img src={image} alt="Product preview" /> : <span><Camera /><b>Upload product image</b><small>PNG, JPG or WebP · Max 2 MB</small></span>}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={chooseImage} /></label>
+      </Modal>}
+      {editingCategory && <Modal title="Edit category" onClose={() => setEditingCategory(null)} onSubmit={updateCategory}>
+        <label>Category name<input name="name" maxLength="60" defaultValue={editingCategory.name} required /></label>
       </Modal>}
     </section>
   );
