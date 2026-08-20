@@ -14,3 +14,5 @@ services:
         value: cheries_finance
       - key: JWT_SECRET
         generateValue: true
+      - key: KEEP_ALIVE_INTERVAL_MINUTES
+        value: "10"

@@ -383,7 +383,29 @@ app.use((error, req, res, next) => {
 const port = process.env.PORT || 4000;
 const server = app.listen(port, () => console.log(`Finance API connected to MongoDB on http://localhost:${port}`));
 
+const keepAliveMinutes = Number(process.env.KEEP_ALIVE_INTERVAL_MINUTES ?? (process.env.RENDER === 'true' ? 10 : 0));
+const renderExternalUrl = String(process.env.RENDER_EXTERNAL_URL || '').trim();
+let keepAliveTimer = null;
+
+if (renderExternalUrl && Number.isFinite(keepAliveMinutes) && keepAliveMinutes >= 5) {
+  const keepAliveUrl = new URL('/api/health', renderExternalUrl).toString();
+  keepAliveTimer = setInterval(async () => {
+    try {
+      const response = await fetch(keepAliveUrl, {
+        headers: { 'User-Agent': 'Cherie-Finance-Keep-Alive/1.0' },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) console.warn(`Keep-alive health request returned HTTP ${response.status}.`);
+    } catch (error) {
+      console.warn(`Keep-alive health request failed: ${error.message}`);
+    }
+  }, keepAliveMinutes * 60 * 1000);
+  keepAliveTimer.unref();
+  console.log(`Render keep-alive enabled every ${keepAliveMinutes} minutes.`);
+}
+
 async function shutdown() {
+  if (keepAliveTimer) clearInterval(keepAliveTimer);
   server.close();
   await client.close();
 }

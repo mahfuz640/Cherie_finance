@@ -86,6 +86,7 @@ Task rule: Nadiya and Mahfuz may assign themselves or each other; Admin may assi
 - Admin assigns Nadiya/Mahfuz dynamic designations and responsibility notes on the shared Team page; identity roles and approval logic remain unchanged.
 - Password page lets each authenticated user change their own password after current-password verification.
 - Render production deploy is a single Node Web Service defined by `render.yaml`: Express serves `frontend/dist`, production frontend calls same-origin `/api`, Node is pinned by `.node-version`, and Mongo startup has bounded retry for transient Atlas TLS failures.
+- Render health endpoint is `/api/health`. Render deployments self-request their automatic `RENDER_EXTERNAL_URL` every 10 minutes by default; `KEEP_ALIVE_INTERVAL_MINUTES=0` disables it. Public monitor URLs must not include internal port `10000`, and an external monitor/paid instance remains the reliable uptime option.
 - Dependency installation and production build completed successfully.
 - No known pending task.
 

@@ -38,6 +38,16 @@ Health Check Path: /api/health
 
 Set `MONGODB_URI`, `MONGODB_DB=cheries_finance`, and a strong `JWT_SECRET` in the Render environment. Production uses same-origin `/api`; `VITE_API_URL` is only needed when frontend and backend are deployed separately.
 
+### Render health monitor
+
+Use this public URL for an HTTP/S monitor—do not append Render's internal port `10000`:
+
+```text
+https://cherie-finance-backend.onrender.com/api/health
+```
+
+On Render, the backend also sends a health request to its own `RENDER_EXTERNAL_URL` every 10 minutes. Set `KEEP_ALIVE_INTERVAL_MINUTES=0` to disable it, or use a value of at least `5`. An external monitor is still more reliable because an already-spun-down process cannot ping itself. Free Render services can restart or spin down under platform limits; use a paid instance when uninterrupted production uptime is required.
+
 ## Demo accounts
 
 | Profile | Password | Access |
