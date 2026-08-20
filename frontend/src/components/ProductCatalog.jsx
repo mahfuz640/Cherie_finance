@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Boxes, Camera, History, Image as ImageIcon, PackagePlus, Plus, ShoppingBag, Tag, TrendingUp } from 'lucide-react';
+import { API } from '../api';
 import Modal from './Modal';
 
-const API = 'http://localhost:4000/api';
 const money = (amount) => `BDT ${Number(amount || 0).toLocaleString('en-BD')}`;
 const PEOPLE = { admin: 'Admin', nadiya: 'Nadiya', mahfuz: 'Mahfuz' };
 const dateText = (date) => date ? new Date(`${date}T00:00:00`).toLocaleDateString('en-BD', { dateStyle: 'medium' }) : '—';
@@ -71,7 +71,7 @@ export default function ProductCatalog({ session, logout, notify, refreshDashboa
     const values = new FormData(form);
     const saved = await request('/products', {
       categoryId: values.get('categoryId'), itemName: values.get('itemName'), productName: values.get('productName'),
-      quantity: values.get('quantity'), buyPrice: values.get('buyPrice'), image, sku: values.get('sku'),
+      quantity: values.get('quantity'), buyPrice: values.get('buyPrice'), image,
       brand: values.get('brand'), supplier: values.get('supplier'), unit: values.get('unit'),
       description: values.get('description'), purchaseDate: values.get('purchaseDate'), expiryDate: values.get('expiryDate'),
       lowStockAlert: values.get('lowStockAlert'),
@@ -124,7 +124,7 @@ export default function ProductCatalog({ session, logout, notify, refreshDashboa
             {catalog.categories.length ? <>
               <div className="product-fields">
                 <label>Category<select name="categoryId" required>{catalog.categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
-                <label>SKU / Product code<input name="sku" maxLength="60" placeholder="e.g. SK-1001" /></label>
+                <div className="auto-code-note"><Tag /><span><b>Product code</b><small>Generated automatically when saved</small></span></div>
                 <label>Item name<input name="itemName" maxLength="100" placeholder="Item or model name" required /></label>
                 <label>Product name<input name="productName" maxLength="120" placeholder="Product display name" required /></label>
                 <label>Brand<input name="brand" maxLength="80" placeholder="Brand name" /></label>
@@ -165,7 +165,7 @@ export default function ProductCatalog({ session, logout, notify, refreshDashboa
             <div className="product-body">
               <small className="item-name">{product.item_name}{product.brand ? ` · ${product.brand}` : ''}</small><h3>{product.product_name}</h3>
               <div className="product-identifiers">
-                {product.sku && <span><small>SKU</small><b>{product.sku}</b></span>}
+                {product.sku && <span><small>Product code</small><b>{product.sku}</b></span>}
                 {product.supplier && <span><small>Supplier</small><b>{product.supplier}</b></span>}
               </div>
               {product.description && <p className="product-description">{product.description}</p>}

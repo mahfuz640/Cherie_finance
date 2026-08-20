@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowUpRight, Building2 } from 'lucide-react';
+import { API } from '../api';
 
-const API = 'http://localhost:4000/api';
 const ROLES = [
   ['admin', 'Admin', 'Full control'],
   ['nadiya', 'Nadiya', 'Team account'],

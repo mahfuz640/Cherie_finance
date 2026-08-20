@@ -76,4 +76,15 @@ img{max-width:100%}
   .requests-table td.empty,.sales-history td.empty{display:block;text-align:center;padding:28px 5px}
   .requests-table td.empty::before,.sales-history td.empty::before{display:none}
   .sales-history .table-subtitle{white-space:normal}.sales-history td:first-child>div,.sales-history td:first-child>b{max-width:62%}
+
+  .investments-table{margin-top:14px}
+  .investments-table .table-wrap{overflow:visible}
+  .investments-table table,.investments-table tbody,.investments-table tr,.investments-table td{display:block;width:100%;min-width:0}
+  .investments-table thead{display:none}
+  .investments-table tbody{display:grid;gap:11px;margin-top:16px}
+  .investments-table tbody tr{padding:10px 13px;border:1px solid var(--border);border-radius:13px;background:#fffafb;box-shadow:0 7px 18px rgba(101,29,59,.05)}
+  .investments-table td{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;padding:8px 0;border:0;text-align:right;white-space:normal}
+  .investments-table td::before{content:attr(data-label);flex:0 0 34%;color:var(--muted);font-size:11px;font-weight:700;text-align:left;text-transform:uppercase;letter-spacing:.4px}
+  .investments-table td.empty{display:block;text-align:center;padding:28px 5px}.investments-table td.empty::before{display:none}
+  .manage-actions{min-width:max-content}.manage-actions>button{width:40px;height:40px}.requests-table .manage-actions{margin-left:auto}
 }

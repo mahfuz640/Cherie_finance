@@ -4,6 +4,8 @@ import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { MongoClient, ObjectId } from 'mongodb';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const app = express();
 const SECRET = process.env.JWT_SECRET || 'development-only-secret';
@@ -13,8 +15,22 @@ if (!MONGODB_URI) throw new Error('MONGODB_URI is required.');
 app.use(cors());
 app.use(express.json({ limit: '4mb' }));
 
-const client = new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: 10000 });
-await client.connect();
+async function connectToMongo() {
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    const candidate = new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: 10000 });
+    try {
+      await candidate.connect();
+      return candidate;
+    } catch (error) {
+      await candidate.close().catch(() => {});
+      if (attempt === 4) throw error;
+      console.warn(`MongoDB connection attempt ${attempt} failed; retrying...`);
+      await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+    }
+  }
+}
+
+const client = await connectToMongo();
 const database = client.db(process.env.MONGODB_DB || 'cheries_finance');
 const users = database.collection('users');
 const investments = database.collection('investments');
@@ -24,10 +40,29 @@ const tasks = database.collection('tasks');
 const categories = database.collection('categories');
 const products = database.collection('products');
 const productSales = database.collection('product_sales');
+const counters = database.collection('counters');
 
 await users.createIndex({ role: 1 }, { unique: true });
 await categories.createIndex({ name: 1 }, { unique: true });
 await users.deleteMany({ role: 'tester' });
+
+async function nextProductCode(session) {
+  const counter = await counters.findOneAndUpdate(
+    { _id: 'product-code' },
+    { $inc: { seq: 1 } },
+    { upsert: true, returnDocument: 'after', session },
+  );
+  return `CF-${String(counter.seq).padStart(6, '0')}`;
+}
+
+const codedProducts = await products.find({ sku: /^CF-\d+$/ }, { projection: { sku: 1 } }).toArray();
+const highestProductCode = codedProducts.reduce((highest, product) => Math.max(highest, Number(product.sku.slice(3)) || 0), 0);
+await counters.updateOne({ _id: 'product-code' }, { $max: { seq: highestProductCode } }, { upsert: true });
+const productsWithoutCodes = await products.find({ $or: [{ sku: { $exists: false } }, { sku: null }, { sku: '' }] }, { projection: { _id: 1 } }).toArray();
+for (const product of productsWithoutCodes) {
+  await products.updateOne({ _id: product._id }, { $set: { sku: await nextProductCode() } });
+}
+await products.createIndex({ sku: 1 }, { unique: true });
 
 const seededUsers = [
   ['Administrator', 'admin', 'admin123', 'Administrator'],
@@ -107,7 +142,7 @@ app.get('/api/dashboard', auth, async (req, res) => {
   res.json({
     stats: { invested, paid, remaining: invested - paid, loanRemaining: loan - loanPaid, selling, companyMoney: invested + selling - paid - expense - stockCost - loanPaid, totalQuantity: stockIn, totalSold: sold, totalStock: stockIn - sold, profit: selling - expense - stockCost },
     requests: requestRows.map(serialize),
-    investments: investmentRows.slice(0, 8).map(serialize),
+    investments: investmentRows.map(serialize),
     transactions: transactionRows.slice(0, 8).map(serialize),
     tasks: taskRows.map(serialize),
     team: teamRows.map(serialize),
@@ -117,8 +152,33 @@ app.get('/api/dashboard', auth, async (req, res) => {
 app.post('/api/investments', auth, canEdit, async (req, res) => {
   const amount = Number(req.body.amount);
   if (!(amount > 0)) return res.status(400).json({ message: 'Enter a valid amount.' });
-  await investments.insertOne({ investor: req.user.name, amount, note: req.body.note || '', created_at: new Date().toISOString() });
+  const note = String(req.body.note || '').trim();
+  if (note.length > 300) return res.status(400).json({ message: 'Investment note cannot exceed 300 characters.' });
+  await investments.insertOne({ investor: req.user.name, amount, note, created_by: req.user.role, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
   res.status(201).json({ ok: true });
+});
+
+function canManageInvestment(investment, user) {
+  return user.role === 'admin' || investment.created_by === user.role || investment.investor === user.name;
+}
+
+app.patch('/api/investments/:id', auth, canEdit, async (req, res) => {
+  const id = idFrom(req.params.id), investment = id && await investments.findOne({ _id: id });
+  if (!investment) return res.status(404).json({ message: 'Investment not found.' });
+  if (!canManageInvestment(investment, req.user)) return res.status(403).json({ message: 'You can only edit your own investments.' });
+  const amount = Number(req.body.amount), note = String(req.body.note || '').trim();
+  if (!(amount > 0)) return res.status(400).json({ message: 'Enter a valid amount.' });
+  if (note.length > 300) return res.status(400).json({ message: 'Investment note cannot exceed 300 characters.' });
+  await investments.updateOne({ _id: id }, { $set: { amount, note, updated_at: new Date().toISOString() } });
+  res.json({ ok: true, message: 'Investment updated.' });
+});
+
+app.delete('/api/investments/:id', auth, canEdit, async (req, res) => {
+  const id = idFrom(req.params.id), investment = id && await investments.findOne({ _id: id });
+  if (!investment) return res.status(404).json({ message: 'Investment not found.' });
+  if (!canManageInvestment(investment, req.user)) return res.status(403).json({ message: 'You can only delete your own investments.' });
+  await investments.deleteOne({ _id: id });
+  res.json({ ok: true, message: 'Investment deleted.' });
 });
 
 app.post('/api/requests', auth, canEdit, async (req, res) => {
@@ -139,6 +199,31 @@ app.patch('/api/requests/:id', auth, canEdit, async (req, res) => {
   const result = await requests.updateOne({ _id: id, status: 'pending' }, { $set: { status: req.body.status, reviewed_by: req.user.role, reviewed_at: new Date().toISOString() } });
   if (!result.modifiedCount) return res.status(409).json({ message: 'This request has already been reviewed.' });
   res.json({ ok: true });
+});
+
+function canManageRequest(request, user) {
+  return user.role === 'admin' || (request.requester === user.role && request.status !== 'approved');
+}
+
+app.patch('/api/requests/:id/details', auth, canEdit, async (req, res) => {
+  const id = idFrom(req.params.id), request = id && await requests.findOne({ _id: id });
+  if (!request) return res.status(404).json({ message: 'Request not found.' });
+  if (!canManageRequest(request, req.user)) return res.status(403).json({ message: 'An approved request can only be edited by Admin.' });
+  const amount = Number(req.body.amount), purpose = String(req.body.purpose || '').trim();
+  if (!(amount > 0)) return res.status(400).json({ message: 'Enter a valid amount.' });
+  if (!purpose || purpose.length > 500) return res.status(400).json({ message: 'Purpose must be between 1 and 500 characters.' });
+  const changes = { amount, purpose, updated_at: new Date().toISOString() };
+  if (req.user.role !== 'admin') Object.assign(changes, { status: 'pending', reviewed_by: null, reviewed_at: null });
+  await requests.updateOne({ _id: id }, { $set: changes });
+  res.json({ ok: true, message: req.user.role === 'admin' ? 'Request updated.' : 'Request updated and sent for approval.' });
+});
+
+app.delete('/api/requests/:id', auth, canEdit, async (req, res) => {
+  const id = idFrom(req.params.id), request = id && await requests.findOne({ _id: id });
+  if (!request) return res.status(404).json({ message: 'Request not found.' });
+  if (!canManageRequest(request, req.user)) return res.status(403).json({ message: 'An approved request can only be deleted by Admin.' });
+  await requests.deleteOne({ _id: id });
+  res.json({ ok: true, message: 'Request deleted.' });
 });
 
 app.post('/api/transactions', auth, canEdit, async (req, res) => {
@@ -190,25 +275,27 @@ app.post('/api/categories', auth, canEdit, async (req, res) => {
 app.post('/api/products', auth, canEdit, async (req, res) => {
   const categoryId = idFrom(req.body.categoryId), itemName = String(req.body.itemName || '').trim(), productName = String(req.body.productName || '').trim();
   const quantity = Number(req.body.quantity), buyPrice = Number(req.body.buyPrice), image = String(req.body.image || '');
-  const sku = String(req.body.sku || '').trim(), brand = String(req.body.brand || '').trim(), supplier = String(req.body.supplier || '').trim(), unit = String(req.body.unit || 'pcs').trim();
+  const brand = String(req.body.brand || '').trim(), supplier = String(req.body.supplier || '').trim(), unit = String(req.body.unit || 'pcs').trim();
   const description = String(req.body.description || '').trim(), purchaseDate = String(req.body.purchaseDate || ''), expiryDate = String(req.body.expiryDate || ''), lowStockAlert = Number(req.body.lowStockAlert);
   if (!categoryId || !(await categories.findOne({ _id: categoryId }))) return res.status(400).json({ message: 'Choose a valid category.' });
   if (!itemName || !productName || itemName.length > 100 || productName.length > 120) return res.status(400).json({ message: 'Enter valid item and product names.' });
   if (!Number.isInteger(quantity) || quantity < 1 || !Number.isFinite(buyPrice) || buyPrice < 0) return res.status(400).json({ message: 'Enter valid quantity and buy price.' });
-  if (sku.length > 60 || brand.length > 80 || supplier.length > 100 || !unit || unit.length > 30 || description.length > 500) return res.status(400).json({ message: 'One or more product details are too long.' });
+  if (brand.length > 80 || supplier.length > 100 || !unit || unit.length > 30 || description.length > 500) return res.status(400).json({ message: 'One or more product details are too long.' });
   if ((purchaseDate && !/^\d{4}-\d{2}-\d{2}$/.test(purchaseDate)) || (expiryDate && !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate))) return res.status(400).json({ message: 'Enter valid purchase and expiry dates.' });
   if (!Number.isInteger(lowStockAlert) || lowStockAlert < 0) return res.status(400).json({ message: 'Enter a valid low-stock alert quantity.' });
   if (image && (!/^data:image\/(png|jpeg|webp);base64,/.test(image) || image.length > 2800000)) return res.status(400).json({ message: 'Upload a PNG, JPG, or WebP image smaller than 2 MB.' });
   const session = client.startSession();
   let productId;
+  let productCode;
   try {
     await session.withTransaction(async () => {
-      const result = await products.insertOne({ category_id: categoryId, item_name: itemName, product_name: productName, image: image || null, quantity, buy_price: buyPrice, sku: sku || null, brand: brand || null, supplier: supplier || null, unit, description: description || null, purchase_date: purchaseDate || null, expiry_date: expiryDate || null, low_stock_alert: lowStockAlert, created_by: req.user.role, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { session });
+      productCode = await nextProductCode(session);
+      const result = await products.insertOne({ category_id: categoryId, item_name: itemName, product_name: productName, image: image || null, quantity, buy_price: buyPrice, sku: productCode, brand: brand || null, supplier: supplier || null, unit, description: description || null, purchase_date: purchaseDate || null, expiry_date: expiryDate || null, low_stock_alert: lowStockAlert, created_by: req.user.role, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { session });
       productId = result.insertedId;
       await transactions.insertOne({ type: 'stock', amount: quantity * buyPrice, quantity, note: `Product stock: ${productName}`, created_by: req.user.role, created_at: new Date().toISOString() }, { session });
     });
   } finally { await session.endSession(); }
-  res.status(201).json({ ok: true, id: productId.toString() });
+  res.status(201).json({ ok: true, id: productId.toString(), productCode });
 });
 
 app.post('/api/products/:id/sales', auth, canEdit, async (req, res) => {
@@ -274,6 +361,18 @@ app.patch('/api/team/:id', auth, async (req, res) => {
   if (responsibilities.length > 800) return res.status(400).json({ message: 'Responsibilities must be 800 characters or less.' });
   await users.updateOne({ _id: id }, { $set: { designation, responsibilities } });
   res.json({ ok: true, message: `${member.name}'s responsibilities were updated.` });
+});
+
+app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+const backendDirectory = path.dirname(fileURLToPath(import.meta.url));
+const frontendDistDirectory = path.resolve(backendDirectory, '../frontend/dist');
+app.use(express.static(frontendDistDirectory));
+app.use((req, res, next) => {
+  if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
+  res.sendFile(path.join(frontendDistDirectory, 'index.html'), (error) => {
+    if (error) next(error);
+  });
 });
 
 app.use((error, req, res, next) => {

@@ -1,6 +1,8 @@
 export { default as AccountSettings } from './AccountSettings';
 export { default as Dashboard } from './Dashboard';
+export { default as InvestmentsTable } from './InvestmentsTable';
 export { default as Login } from './Login';
+export { default as ManagementModals } from './ManagementModals';
 export { default as Modal } from './Modal';
 export { default as ProductCatalog } from './ProductCatalog';
 export { default as TeamManagement } from './TeamManagement';

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
+import { API } from '../api';
 import AccountSettings from './AccountSettings';
 import FinanceModals from './FinanceModals';
-import QuickEntry from './QuickEntry';
+import InvestmentsTable from './InvestmentsTable';
+import ManagementModals from './ManagementModals';
 import ProductCatalog from './ProductCatalog';
 import RequestsTable from './RequestsTable';
 import Sidebar from './Sidebar';
@@ -10,11 +12,11 @@ import StatsGrid from './StatsGrid';
 import TeamManagement from './TeamManagement';
 import WorkPlan from './WorkPlan';
 
-const API = 'http://localhost:4000/api';
-
 export default function Dashboard({ session, logout }) {
   const [data, setData] = useState(null);
   const [modal, setModal] = useState(null);
+  const [editingRequest, setEditingRequest] = useState(null);
+  const [editingInvestment, setEditingInvestment] = useState(null);
   const [notice, setNotice] = useState('');
   const [activePage, setActivePage] = useState('overview');
   const role = session.user.role;
@@ -48,6 +50,14 @@ export default function Dashboard({ session, logout }) {
     setTimeout(() => setNotice(''), 2800);
   }
 
+  function deleteRequest(request) {
+    if (window.confirm(`Delete the ${request.status} request for BDT ${Number(request.amount).toLocaleString('en-BD')}?`)) send(`/requests/${request.id}`, {}, 'DELETE');
+  }
+
+  function deleteInvestment(investment) {
+    if (window.confirm(`Delete the BDT ${Number(investment.amount).toLocaleString('en-BD')} investment?`)) send(`/investments/${investment.id}`, {}, 'DELETE');
+  }
+
   if (!data) return <div className="loading">Loading finance workspace…</div>;
   const currentUser = data.team?.find((member) => member.role === role) || session.user;
 
@@ -64,10 +74,8 @@ export default function Dashboard({ session, logout }) {
         </header>
         {notice && <div className="notice">{notice}</div>}
         <StatsGrid stats={data.stats} />
-        <section className="lower">
-          <RequestsTable requests={data.requests} role={role} onReview={(id, status) => send(`/requests/${id}`, { status }, 'PATCH')} />
-          <QuickEntry writable={writable} onSelect={setModal} />
-        </section>
+        <RequestsTable requests={data.requests} role={role} onReview={(id, status) => send(`/requests/${id}`, { status }, 'PATCH')} onEdit={setEditingRequest} onDelete={deleteRequest} />
+        <InvestmentsTable investments={data.investments || []} user={currentUser} onEdit={setEditingInvestment} onDelete={deleteInvestment} />
         </>}
         {activePage === 'plan' && <>
           <header><div><span className="eyebrow">TEAM OPERATIONS</span><h1>Our shared work plan</h1><p>Plan for yourself or each other with notes, date and time.</p></div></header>
@@ -91,6 +99,7 @@ export default function Dashboard({ session, logout }) {
         </>}
       </main>
       <FinanceModals modal={modal} onClose={() => setModal(null)} onSend={send} />
+      <ManagementModals request={editingRequest} investment={editingInvestment} onClose={() => { setEditingRequest(null); setEditingInvestment(null); }} onSend={send} />
     </div>
   );
 }

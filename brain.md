@@ -41,10 +41,15 @@ Task rule: Nadiya and Mahfuz may assign themselves or each other; Admin may assi
 ## Main API
 
 - `POST /api/login`
+- `GET /api/health`
 - `GET /api/dashboard`
 - `POST /api/investments`
+- `PATCH /api/investments/:id`
+- `DELETE /api/investments/:id`
 - `POST /api/requests`
 - `PATCH /api/requests/:id`
+- `PATCH /api/requests/:id/details`
+- `DELETE /api/requests/:id`
 - `POST /api/transactions`
 - `POST /api/tasks`
 - `PATCH /api/tasks/:id`
@@ -72,11 +77,15 @@ Task rule: Nadiya and Mahfuz may assign themselves or each other; Admin may assi
 - Frontend and backend are separated into npm workspaces under `frontend/` and `backend/`.
 - Frontend pages and UI sections are split into reusable files under `frontend/src/components/`.
 - Visual theme uses the rose/pink design overrides in `frontend/src/theme.css`.
-- `ProductCatalog.jsx` provides categories, images, SKU/brand/supplier/unit metadata, purchase/expiry dates, low-stock alerts, notes, inventory value, and timed sales/profit history.
-- Phone/tablet overrides live in `frontend/src/responsive.css`, including fixed bottom navigation, touch sizing, bottom-sheet modals, and card-style request/sales tables; product-specific styles are in `frontend/src/catalog.css`.
+- Product codes are generated atomically by MongoDB as `CF-000001`, and existing uncoded products are backfilled at backend startup.
+- `ProductCatalog.jsx` provides categories, images, automatic product codes, brand/supplier/unit metadata, purchase/expiry dates, low-stock alerts, notes, inventory value, and timed sales/profit history.
+- Request owners can edit/delete pending or rejected requests; editing a rejected request returns it to pending. Approved requests are immutable except for Admin. Investment owners can edit/delete their records at any time, while Admin can manage every request and investment.
+- The Overview page has no Quick Entry card; it focuses on request and investment management.
+- Phone/tablet overrides live in `frontend/src/responsive.css`, including fixed bottom navigation, touch sizing, bottom-sheet modals, and card-style request/investment/sales tables; product-specific styles are in `frontend/src/catalog.css`.
 - Shared Work Plan supports self/cross-assignment, priority, planning notes, date, time, and status tracking.
 - Admin assigns Nadiya/Mahfuz dynamic designations and responsibility notes on the shared Team page; identity roles and approval logic remain unchanged.
 - Password page lets each authenticated user change their own password after current-password verification.
+- Render production deploy is a single Node Web Service defined by `render.yaml`: Express serves `frontend/dist`, production frontend calls same-origin `/api`, Node is pinned by `.node-version`, and Mongo startup has bounded retry for transient Atlas TLS failures.
 - Dependency installation and production build completed successfully.
 - No known pending task.
 
