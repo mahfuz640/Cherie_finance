@@ -1,5 +1,23 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Dashboard, Login } from './components';
+
+class DashboardBoundary extends React.Component {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error) {
+    console.error('Dashboard render failed:', error);
+    this.props.onError();
+  }
+
+  render() {
+    if (this.state.failed) return <div className="loading">Returning to the login page…</div>;
+    return this.props.children;
+  }
+}
 
 function savedSession() {
   try {
@@ -20,5 +38,7 @@ export default function App() {
     setSession(null);
   }
 
-  return <Dashboard session={session} logout={logout} />;
+  return <DashboardBoundary key={session.user?.id || session.user?.role} onError={logout}>
+    <Dashboard session={session} logout={logout} />
+  </DashboardBoundary>;
 }
