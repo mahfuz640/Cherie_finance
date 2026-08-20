@@ -18,15 +18,23 @@ export default function Dashboard({ session, logout }) {
   const [editingRequest, setEditingRequest] = useState(null);
   const [editingInvestment, setEditingInvestment] = useState(null);
   const [notice, setNotice] = useState('');
+  const [loadError, setLoadError] = useState('');
   const [activePage, setActivePage] = useState('overview');
   const role = session.user.role;
   const writable = ['admin', 'nadiya', 'mahfuz'].includes(role);
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${session.token}` };
 
   async function load() {
-    const response = await fetch(`${API}/dashboard`, { headers });
-    if (response.status === 401) return logout();
-    setData(await response.json());
+    try {
+      const response = await fetch(`${API}/dashboard`, { headers });
+      if (response.status === 401) return logout();
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || 'Could not load the dashboard.');
+      setData(result);
+      setLoadError('');
+    } catch (error) {
+      setLoadError(error.message || 'Could not connect to the server.');
+    }
   }
 
   useEffect(() => { load(); }, []);
@@ -58,7 +66,7 @@ export default function Dashboard({ session, logout }) {
     if (window.confirm(`Delete the BDT ${Number(investment.amount).toLocaleString('en-BD')} investment?`)) send(`/investments/${investment.id}`, {}, 'DELETE');
   }
 
-  if (!data) return <div className="loading">Loading finance workspace…</div>;
+  if (!data) return <div className="loading">{loadError || 'Loading finance workspace…'}{loadError && <button className="primary" onClick={load}>Try again</button>}</div>;
   const currentUser = data.team?.find((member) => member.role === role) || session.user;
 
   return (
