@@ -34,7 +34,7 @@ img{max-width:100%}
   .table-wrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}.table-wrap table{min-width:650px}
   th,td{white-space:nowrap;padding:11px 8px}
 
-  .overlay{align-items:end;padding:0}.modal{width:100%;max-height:92dvh;overflow-y:auto;border-radius:20px 20px 0 0;padding:21px 18px calc(20px + env(safe-area-inset-bottom))}
+  .overlay{align-items:start;padding:0}.modal{width:100%;max-height:92dvh;overflow-y:auto;border-radius:0 0 20px 20px;padding:calc(21px + env(safe-area-inset-top)) 18px 20px}
   .plan-summary{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.plan-summary article{padding:12px 9px;gap:8px}.plan-summary strong{font-size:19px}.plan-summary small{font-size:10px}.task-form{order:0}.task-form,.task-list{padding:16px}.task-card{padding:14px}.task-meta{display:grid;gap:7px}.status-control{max-width:100%}
   .settings-layout{margin-top:22px}.account-card{padding:28px 18px}.password-card{padding:20px 17px}
 

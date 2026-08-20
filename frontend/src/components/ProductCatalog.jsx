@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Boxes, Camera, History, Image as ImageIcon, PackagePlus, Plus, ShoppingBag, Tag, TrendingUp } from 'lucide-react';
+import { AlertTriangle, Boxes, Camera, History, Image as ImageIcon, PackagePlus, Pencil, Plus, ShoppingBag, Tag, TrendingUp } from 'lucide-react';
 import { API } from '../api';
 import Modal from './Modal';
 
@@ -28,6 +28,7 @@ export default function ProductCatalog({ session, logout, notify, refreshDashboa
   const [catalog, setCatalog] = useState(null);
   const [image, setImage] = useState('');
   const [selectedSale, setSelectedSale] = useState(null);
+  const [editingProduct, setEditingProduct] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const writable = ['admin', 'nadiya', 'mahfuz'].includes(session.user.role);
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${session.token}` };
@@ -42,8 +43,8 @@ export default function ProductCatalog({ session, logout, notify, refreshDashboa
 
   useEffect(() => { load(); }, []);
 
-  async function request(path, body) {
-    const response = await fetch(`${API}${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+  async function request(path, body, method = 'POST') {
+    const response = await fetch(`${API}${path}`, { method, headers, body: JSON.stringify(body) });
     const result = await response.json();
     if (response.status === 401) { logout(); return false; }
     if (!response.ok) { notify(result.message); return false; }
@@ -86,6 +87,17 @@ export default function ProductCatalog({ session, logout, notify, refreshDashboa
       quantity: values.get('quantity'), sellPrice: values.get('sellPrice'), soldAt: values.get('soldAt'),
     });
     if (saved) setSelectedSale(null);
+  }
+
+  async function updateProduct(event) {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    const saved = await request(`/products/${editingProduct.id}`, {
+      categoryId: values.get('categoryId'), itemName: values.get('itemName'), productName: values.get('productName'), image,
+      brand: values.get('brand'), supplier: values.get('supplier'), unit: values.get('unit'), description: values.get('description'),
+      purchaseDate: values.get('purchaseDate'), expiryDate: values.get('expiryDate'), lowStockAlert: values.get('lowStockAlert'),
+    }, 'PATCH');
+    if (saved) { setEditingProduct(null); setImage(''); }
   }
 
   const visibleProducts = useMemo(() => {
@@ -178,7 +190,10 @@ export default function ProductCatalog({ session, logout, notify, refreshDashboa
                 <span><small>Gross profit</small><strong>{money(product.total_sales - product.sold_quantity * product.buy_price)}</strong></span>
               </div>
               <div className="product-dates"><span>Purchased <b>{dateText(product.purchase_date)}</b></span><span>Expires <b>{dateText(product.expiry_date)}</b></span></div>
-              {writable && <button className="sell-button" disabled={!product.quantity} onClick={() => setSelectedSale(product)}>{product.quantity ? 'Record a sale' : 'Out of stock'}</button>}
+              {writable && <div className="product-actions">
+                {session.user.role === 'admin' && <button type="button" className="edit-product" onClick={() => { setEditingProduct(product); setImage(product.image || ''); }}><Pencil size={16} /> Edit product</button>}
+                <button className="sell-button" disabled={!product.quantity} onClick={() => setSelectedSale(product)}>{product.quantity ? 'Record a sale' : 'Out of stock'}</button>
+              </div>}
             </div>
           </article>
         )) : <div className="empty-products"><ShoppingBag /><h3>No products found</h3><p>Add a category and your first product to get started.</p></div>}
@@ -196,6 +211,19 @@ export default function ProductCatalog({ session, logout, notify, refreshDashboa
         <label>Sell quantity<input name="quantity" type="number" min="1" max={selectedSale.quantity} step="1" required /></label>
         <label>Sell price per item (BDT)<input name="sellPrice" type="number" min="0" step="0.01" required /></label>
         <label>Selling date and time<input name="soldAt" type="datetime-local" defaultValue={localDateTime()} required /></label>
+      </Modal>}
+      {editingProduct && <Modal title={`Edit ${editingProduct.product_name}`} onClose={() => { setEditingProduct(null); setImage(''); }} onSubmit={updateProduct}>
+        <label>Category<select name="categoryId" defaultValue={editingProduct.category_id} required>{catalog.categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
+        <label>Item name<input name="itemName" maxLength="100" defaultValue={editingProduct.item_name} required /></label>
+        <label>Product name<input name="productName" maxLength="120" defaultValue={editingProduct.product_name} required /></label>
+        <label>Brand<input name="brand" maxLength="80" defaultValue={editingProduct.brand || ''} /></label>
+        <label>Supplier<input name="supplier" maxLength="100" defaultValue={editingProduct.supplier || ''} /></label>
+        <label>Unit<select name="unit" defaultValue={editingProduct.unit || 'pcs'}><option value="pcs">Pieces (pcs)</option><option value="box">Box</option><option value="pack">Pack</option><option value="kg">Kilogram (kg)</option><option value="g">Gram (g)</option><option value="litre">Litre</option><option value="ml">Millilitre (ml)</option></select></label>
+        <label>Low-stock alert at<input name="lowStockAlert" type="number" min="0" step="1" defaultValue={editingProduct.low_stock_alert} required /></label>
+        <label>Purchase date<input name="purchaseDate" type="date" defaultValue={editingProduct.purchase_date || ''} /></label>
+        <label>Expiry date<input name="expiryDate" type="date" defaultValue={editingProduct.expiry_date || ''} /></label>
+        <label>Product notes<textarea name="description" maxLength="500" defaultValue={editingProduct.description || ''} /></label>
+        <label className="image-upload">{image ? <img src={image} alt="Product preview" /> : <span><Camera /><b>Upload product image</b><small>PNG, JPG or WebP · Max 2 MB</small></span>}<input type="file" accept="image/png,image/jpeg,image/webp" onChange={chooseImage} /></label>
       </Modal>}
     </section>
   );

@@ -299,6 +299,24 @@ app.post('/api/products', auth, canEdit, async (req, res) => {
   res.status(201).json({ ok: true, id: productId.toString(), productCode });
 });
 
+app.patch('/api/products/:id', auth, canEdit, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: 'Only Admin can edit products.' });
+  const productId = idFrom(req.params.id), categoryId = idFrom(req.body.categoryId);
+  const itemName = String(req.body.itemName || '').trim(), productName = String(req.body.productName || '').trim();
+  const image = String(req.body.image || ''), brand = String(req.body.brand || '').trim(), supplier = String(req.body.supplier || '').trim();
+  const unit = String(req.body.unit || 'pcs').trim(), description = String(req.body.description || '').trim();
+  const purchaseDate = String(req.body.purchaseDate || ''), expiryDate = String(req.body.expiryDate || ''), lowStockAlert = Number(req.body.lowStockAlert);
+  if (!productId || !await products.findOne({ _id: productId })) return res.status(404).json({ message: 'Product not found.' });
+  if (!categoryId || !await categories.findOne({ _id: categoryId })) return res.status(400).json({ message: 'Choose a valid category.' });
+  if (!itemName || !productName || itemName.length > 100 || productName.length > 120) return res.status(400).json({ message: 'Enter valid item and product names.' });
+  if (brand.length > 80 || supplier.length > 100 || !unit || unit.length > 30 || description.length > 500) return res.status(400).json({ message: 'One or more product details are too long.' });
+  if ((purchaseDate && !/^\d{4}-\d{2}-\d{2}$/.test(purchaseDate)) || (expiryDate && !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate))) return res.status(400).json({ message: 'Enter valid purchase and expiry dates.' });
+  if (!Number.isInteger(lowStockAlert) || lowStockAlert < 0) return res.status(400).json({ message: 'Enter a valid low-stock alert quantity.' });
+  if (image && (!/^data:image\/(png|jpeg|webp);base64,/.test(image) || image.length > 2800000)) return res.status(400).json({ message: 'Upload a PNG, JPG, or WebP image smaller than 2 MB.' });
+  await products.updateOne({ _id: productId }, { $set: { category_id: categoryId, item_name: itemName, product_name: productName, image: image || null, brand: brand || null, supplier: supplier || null, unit, description: description || null, purchase_date: purchaseDate || null, expiry_date: expiryDate || null, low_stock_alert: lowStockAlert, updated_at: new Date().toISOString() } });
+  res.json({ ok: true, message: 'Product updated.' });
+});
+
 app.post('/api/products/:id/sales', auth, canEdit, async (req, res) => {
   const productId = idFrom(req.params.id), quantity = Number(req.body.quantity), sellPrice = Number(req.body.sellPrice), soldAt = String(req.body.soldAt || '');
   if (!productId || !Number.isInteger(quantity) || quantity < 1 || !Number.isFinite(sellPrice) || sellPrice < 0) return res.status(400).json({ message: 'Enter valid sell quantity and price.' });
@@ -337,6 +355,15 @@ app.patch('/api/tasks/:id', auth, canEdit, async (req, res) => {
   const id = idFrom(req.params.id), task = id && await tasks.findOne({ _id: id });
   if (!task) return res.status(404).json({ message: 'Task not found.' });
   if (req.user.role !== 'admin' && task.assigned_to !== req.user.role) return res.status(403).json({ message: 'Only the assigned person can update this task.' });
+  if (req.user.role === 'admin' && req.body.title !== undefined) {
+    const title = String(req.body.title || '').trim(), description = String(req.body.planningNote || req.body.description || '').trim();
+    const assignedTo = String(req.body.assignedTo || '').toLowerCase(), priority = String(req.body.priority || 'medium');
+    const dueDate = String(req.body.dueDate || ''), dueTime = String(req.body.dueTime || '');
+    if (!title || title.length > 120 || !['admin', 'nadiya', 'mahfuz'].includes(assignedTo)) return res.status(400).json({ message: 'Enter valid task details.' });
+    if (!['low', 'medium', 'high'].includes(priority) || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || !/^\d{2}:\d{2}$/.test(dueTime)) return res.status(400).json({ message: 'Enter valid task schedule and priority.' });
+    await tasks.updateOne({ _id: id }, { $set: { title, description, assigned_to: assignedTo, priority, due_date: dueDate, due_time: dueTime, updated_at: new Date().toISOString() } });
+    return res.json({ ok: true, message: 'Task updated.' });
+  }
   if (!['todo', 'in_progress', 'completed'].includes(req.body.status)) return res.status(400).json({ message: 'Invalid task status.' });
   await tasks.updateOne({ _id: id }, { $set: { status: req.body.status, updated_at: new Date().toISOString() } });
   res.json({ ok: true });

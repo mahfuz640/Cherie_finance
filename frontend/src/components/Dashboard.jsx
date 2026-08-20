@@ -88,7 +88,7 @@ export default function Dashboard({ session, logout }) {
         {activePage === 'plan' && <>
           <header><div><span className="eyebrow">TEAM OPERATIONS</span><h1>Our shared work plan</h1><p>Plan for yourself or each other with notes, date and time.</p></div></header>
           {notice && <div className="notice">{notice}</div>}
-          <WorkPlan tasks={data.tasks || []} role={role} onCreate={(task) => send('/tasks', task)} onUpdate={(id, status) => send(`/tasks/${id}`, { status }, 'PATCH')} />
+          <WorkPlan tasks={data.tasks || []} role={role} onCreate={(task) => send('/tasks', task)} onUpdate={(id, changes) => send(`/tasks/${id}`, typeof changes === 'string' ? { status: changes } : changes, 'PATCH')} />
         </>}
         {activePage === 'products' && <>
           <header><div><span className="eyebrow">PRODUCT & INVENTORY</span><h1>Product catalog</h1><p>Organize categories, stock products and record every sale.</p></div></header>

@@ -1,4 +1,6 @@
-import { CalendarClock, CheckCircle2, Circle, Clock3, Plus, Users } from 'lucide-react';
+import { CalendarClock, CheckCircle2, Circle, Clock3, Pencil, Plus, Users } from 'lucide-react';
+import { useState } from 'react';
+import Modal from './Modal';
 
 const PEOPLE = { admin: 'Admin', nadiya: 'Nadiya', mahfuz: 'Mahfuz' };
 const STATUS_LABELS = { todo: 'To do', in_progress: 'In progress', completed: 'Completed' };
@@ -18,6 +20,7 @@ function formatSchedule(task) {
 }
 
 export default function WorkPlan({ tasks, role, onCreate, onUpdate }) {
+  const [editingTask, setEditingTask] = useState(null);
   const options = assignmentOptions(role);
   const canAssign = options.length > 0;
   const counts = {
@@ -39,6 +42,13 @@ export default function WorkPlan({ tasks, role, onCreate, onUpdate }) {
       dueTime: values.get('dueTime'),
     });
     if (saved) form.reset();
+  }
+
+  async function editTask(event) {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget);
+    const saved = await onUpdate(editingTask.id, { title: values.get('title'), planningNote: values.get('planningNote'), assignedTo: values.get('assignedTo'), priority: values.get('priority'), dueDate: values.get('dueDate'), dueTime: values.get('dueTime') });
+    if (saved) setEditingTask(null);
   }
 
   return (
@@ -76,7 +86,7 @@ export default function WorkPlan({ tasks, role, onCreate, onUpdate }) {
               <article className={`task-card ${task.status}`} key={task.id}>
                 <div className="task-card-top">
                   <span className={`priority ${task.priority}`}>{task.priority}</span>
-                  <span className={`task-status ${task.status}`}><StatusIcon />{STATUS_LABELS[task.status]}</span>
+                  <div className="task-card-actions">{role === 'admin' && <button type="button" className="edit-action" title="Edit task" onClick={() => setEditingTask(task)}><Pencil size={16} /></button>}<span className={`task-status ${task.status}`}><StatusIcon />{STATUS_LABELS[task.status]}</span></div>
                 </div>
                 <h3>{task.title}</h3>
                 {task.description && <div className="planning-note"><small>PLANNING NOTES</small><p>{task.description}</p></div>}
@@ -98,6 +108,14 @@ export default function WorkPlan({ tasks, role, onCreate, onUpdate }) {
           }) : <div className="empty-plan"><CheckCircle2 /><h3>No tasks yet</h3><p>Your shared work plan will appear here.</p></div>}
         </div>
       </div>
+      {editingTask && <Modal title="Edit task" onClose={() => setEditingTask(null)} onSubmit={editTask}>
+        <label>Task title<input name="title" maxLength="120" defaultValue={editingTask.title} required /></label>
+        <label>Planning notes<textarea name="planningNote" defaultValue={editingTask.description || ''} /></label>
+        <label>Assign to<select name="assignedTo" defaultValue={editingTask.assigned_to}>{assignmentOptions('admin').map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+        <label>Priority<select name="priority" defaultValue={editingTask.priority}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+        <label>Planning date<input name="dueDate" type="date" defaultValue={editingTask.due_date} required /></label>
+        <label>Planning time<input name="dueTime" type="time" defaultValue={editingTask.due_time} required /></label>
+      </Modal>}
     </section>
   );
 }
