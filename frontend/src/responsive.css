@@ -64,6 +64,12 @@ img{max-width:100%}
   .notice{z-index:35;bottom:calc(78px + env(safe-area-inset-bottom))}
   .overlay{z-index:30}
 
+  .overview-page{display:flex;flex-direction:column}
+  .overview-page header{order:0}
+  .overview-page .requests-table{order:1}
+  .overview-page .investments-table{order:2}
+  .overview-page .stats{order:3}
+
   .requests-table .table-wrap,.sales-history .table-wrap{overflow:visible}
   .requests-table table,.requests-table tbody,.requests-table tr,.requests-table td,.sales-history table,.sales-history tbody,.sales-history tr,.sales-history td{display:block;width:100%;min-width:0}
   .requests-table thead,.sales-history thead{display:none}

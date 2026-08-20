@@ -73,7 +73,7 @@ export default function Dashboard({ session, logout }) {
     <div className="shell">
       <Sidebar user={currentUser} role={role} activePage={activePage} onNavigate={setActivePage} logout={logout} />
       <main className="content">
-        {activePage === 'overview' && <><header>
+        {activePage === 'overview' && <div className="overview-page"><header>
           <div><span className="eyebrow">FINANCE OVERVIEW</span><h1>Good day, {currentUser.name}.</h1><p>Track every taka and approve decisions from one dashboard.</p></div>
           {writable && <div className="actions">
             {['nadiya', 'mahfuz'].includes(role) && <button onClick={() => setModal('request')}>Request money</button>}
@@ -84,7 +84,7 @@ export default function Dashboard({ session, logout }) {
         <StatsGrid stats={data.stats} />
         <RequestsTable requests={data.requests} role={role} onReview={(id, status) => send(`/requests/${id}`, { status }, 'PATCH')} onEdit={setEditingRequest} onDelete={deleteRequest} />
         <InvestmentsTable investments={data.investments || []} user={currentUser} onEdit={setEditingInvestment} onDelete={deleteInvestment} />
-        </>}
+        </div>}
         {activePage === 'plan' && <>
           <header><div><span className="eyebrow">TEAM OPERATIONS</span><h1>Our shared work plan</h1><p>Plan for yourself or each other with notes, date and time.</p></div></header>
           {notice && <div className="notice">{notice}</div>}
